@@ -1,0 +1,52 @@
+name: BEARS TOKYO New Arrivals Monitor
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      send_test_email:
+        description: "테스트 이메일도 발송"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bears-tokyo-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check New Arrivals and send email
+        env:
+          NAVER_EMAIL: ${{ secrets.NAVER_EMAIL }}
+          NAVER_APP_PASSWORD: ${{ secrets.NAVER_APP_PASSWORD }}
+          ALERT_TO: ${{ secrets.ALERT_TO }}
+          SEND_TEST_EMAIL: ${{ inputs.send_test_email }}
+        run: python monitor.py
+
+      - name: Save monitoring state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+users.noreply.github.com"
+          git add state.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Update monitored product IDs"
+            git push
+          fi
